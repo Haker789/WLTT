@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>物理贴贴 · 云端台阶闯关</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: #fef3d4;
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; user-select: none; -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent; overflow-x: hidden;
+        }
+        .app {
+            width: 100%; max-width: 500px; height: 100vh; max-height: 950px;
+            position: relative; overflow: hidden; background: #fef7e0;
+            box-shadow: 0 0 40px rgba(0,0,0,0.15); border-radius: 16px;
+        }
+        .screen { position: absolute; inset:0; display:flex; flex-direction:column; transition: opacity 0.4s; width:100%; height:100%; }
+        .screen.hidden { display:none !important; }
+        .login-screen { background: radial-gradient(ellipse at 50% 30%, #ffe9c4 0%, #f7d99c 55%, #e8c78a 100%); z-index:30; align-items:center; justify-content:center; text-align:center; }
+        .login-screen input { display:block; width:80%; max-width:280px; margin:12px auto; padding:12px; border-radius:24px; border:2px solid #e8a838; font-size:1rem; text-align:center; }
+        .login-screen button { background:#e8a838; color:#fff; border:none; padding:12px 36px; border-radius:30px; font-weight:bold; cursor:pointer; font-size:1rem; }
+        .cover-screen { background: radial-gradient(ellipse at 50% 30%, #ffe9c4 0%, #f7d99c 55%, #e8c78a 100%); z-index:20; align-items:center; justify-content:center; overflow-y:auto; padding:20px 0; }
+        .game-screen { background:#fef7e0; z-index:15; }
+        .tower-group { display:flex; flex-direction:column; align-items:center; margin-bottom:10px; }
+        .spire { width:6px; height:35px; background:linear-gradient(#ffeaa7,#d4a000); border-radius:3px; box-shadow:0 0 15px gold; margin:0 auto; }
+        .spire-star { font-size:1.5em; animation: spin 5s linear infinite; text-align:center; }
+        @keyframes spin { 100%{transform:rotateY(360deg);} }
+        .floor { border:2px solid; border-radius:8px 8px 0 0; margin-top:-2px; padding:10px 14px; font-weight:bold; font-size:0.7em; color:#fff; cursor:pointer; transition:0.2s; text-align:center; box-shadow:0 0 10px rgba(0,0,0,0.1); }
+        .floor:hover { filter:brightness(1.2); transform:translateY(-2px); }
+        .f8{background:#7e6aa0;border-color:#5e4890;width:80%} .f7{background:#d07a50;border-color:#a05030;width:85%}
+        .f6{background:#4e85b8;border-color:#2a5a8a;width:88%} .f5{background:#4e85b8;border-color:#2a5a8a;width:90%}
+        .f4{background:#5a9a68;border-color:#306840;width:92%} .f3{background:#5a9a68;border-color:#306840;width:94%}
+        .f2{background:#c07080;border-color:#903a50;width:96%} .f1{background:#c9a040;border-color:#8a6820;width:98%}
+        .arch{width:100%;height:28px;background:#9b8a6a;border:2px solid #705030;border-radius:0 0 14px 14px;margin-top:-2px}
+        .floor.locked { opacity:0.45; cursor:not-allowed; filter:grayscale(0.7); }
+        .floor.completed { border-color:#ffd700!important; box-shadow:0 0 16px gold; }
+        .title h1{font-size:1.7em;background:linear-gradient(#ffeaa7,#d4a000);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;}
+        .top-bar { background:#f5e6c8; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; border-bottom:2px solid #d4b88c; }
+        .badge { padding:5px 12px; border-radius:16px; font-weight:bold; font-size:0.75em; }
+        .badge.room { background:#e8a838; color:#fff; } .badge.stair { color:#5a4020; flex:1; text-align:center; font-size:0.82em; }
+        .badge.score { background:#e0d0b0; } .badge.moves { background:#d97060; color:#fff; } .badge.diff { background:#5ec49a; color:#fff; font-size:0.7em; }
+        .stage-dots { display:flex; gap:6px; padding:6px 16px; justify-content:center; background:#fef3d4; flex-wrap:wrap; }
+        .stage-dot { width:24px; height:24px; border-radius:50%; background:#e0c8a0; display:flex; align-items:center; justify-content:center; font-size:0.7em; }
+        .stage-dot.done { background:#5ec49a; color:#fff; } .stage-dot.current { background:#e8a838; color:#fff; box-shadow:0 0 10px #e8a838; }
+        .stage-dot.locked { background:#ddd; color:#aaa; }
+        .card-grid { flex:1; overflow-y:auto; padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px; background:#fef3d4; }
+        .pcard { background:#fffaf0; border-radius:24px; min-height:80px; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; font-size:0.82rem; padding:10px 6px; border:2px solid #e0c8a0; cursor:pointer; transition:0.1s; box-shadow:0 4px 0 rgba(0,0,0,0.05); word-break:break-word; position:relative; }
+        .pcard:active { transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,0.1); }
+        .pcard.selected { border-color:#e8a838!important; background:#fff4d8; box-shadow:0 0 20px rgba(232,168,56,0.6); }
+        .pcard.eliminated { visibility:hidden; opacity:0; transform:scale(0.7); transition:0.3s; }
+        .pcard.hint-glow { animation: hint 0.6s ease-in-out 3; border-color:#ffd700!important; }
+        @keyframes hint { 0%,100%{box-shadow:0 0 8px gold} 50%{box-shadow:0 0 28px gold} }
+        .dock { background:#f5e6c8; padding:10px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap; border-top:2px solid #d4b88c; }
+        .itm { background:#fffaf0; border:1px solid #c0a878; padding:8px 12px; border-radius:20px; font-size:0.72em; cursor:pointer; display:flex; align-items:center; gap:4px; }
+        .itm:active { background:#eee0c0; } .cnt { background:#e8a838; color:#fff; border-radius:10px; padding:2px 7px; font-size:0.7em; font-weight:bold; }
+        .toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#e8a838; color:#fff; padding:10px 24px; border-radius:24px; z-index:200; animation:slide 0.3s; }
+        @keyframes slide { from{opacity:0;transform:translateX(-50%) translateY(20px);} }
+        .modal { position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:30; }
+        .modal-box { background:#fffaf0; padding:24px; border-radius:24px; text-align:center; max-width:300px; width:85%; border:2px solid #e8a838; }
+        .modal-box button { background:#e8a838; color:#fff; border:none; padding:10px 20px; border-radius:20px; margin:4px; font-weight:bold; cursor:pointer; }
+        .combo-pop { position:fixed; left:50%; top:40%; transform:translate(-50%,-50%); font-size:2.5rem; font-weight:900; color:#e8a838; text-shadow:0 0 20px rgba(232,168,56,0.8); animation:comboAnim 0.8s ease-out forwards; pointer-events:none; z-index:250; }
+        @keyframes comboAnim { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.5);} 30%{opacity:1;transform:translate(-50%,-50%) scale(1.2);} 100%{opacity:0;transform:translate(-50%,-50%) scale(1.5);} }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+    <div class="screen login-screen" id="loginScreen">
+        <h2 style="color:#5a4020;">🔐 输入你的物理学家昵称</h2>
+        <input type="text" id="nicknameInput" placeholder="例如：爱因斯坦">
+        <button onclick="login()">🏛️ 进入大厦</button>
+    </div>
+    <div class="screen cover-screen hidden" id="coverScreen">
+        <div class="tower-group">
+            <div class="spire"></div><div class="spire-star">⭐</div>
+            <div class="floor f8" onclick="enterRoom(7)">爱因斯坦·综合厅</div>
+            <div class="floor f7" onclick="enterRoom(6)">焦耳·热力室</div>
+            <div class="floor f6" onclick="enterRoom(5)">法拉第·电力室</div>
+            <div class="floor f5" onclick="enterRoom(4)">欧姆·电路室</div>
+            <div class="floor f4" onclick="enterRoom(3)">帕斯卡·机械室</div>
+            <div class="floor f3" onclick="enterRoom(2)">阿基米德·运动厅</div>
+            <div class="floor f2" onclick="enterRoom(1)">牛顿·棱镜室</div>
+            <div class="floor f1" onclick="enterRoom(0)">伽利略·回声室</div>
+            <div class="arch"></div>
+        </div>
+        <div class="title"><h1>物理贴贴</h1></div>
+        <p style="color:#5a4a2a;margin:4px 0;">欢迎，<span id="welcomeUser"></span>！</p>
+        <p style="color:#8a7a5a;font-size:0.7em;">785组知识配对 · 陕西中考全覆盖 · 44台阶闯关</p>
+        <button onclick="logout()" style="background:transparent;border:1px solid #8a6820;padding:6px 16px;border-radius:16px;cursor:pointer;font-size:0.8em;">切换账号</button>
+    </div>
+    <div class="screen game-screen hidden" id="gameScreen">
+        <div class="top-bar">
+            <span class="badge room" id="roomTag">伽利略·回声室</span>
+            <span class="badge stair" id="stairTag">小关卡1 台阶1/11</span>
+            <span class="badge diff" id="diffTag">⭐</span>
+            <span class="badge score">🏆<span id="scoreVal">0</span></span>
+            <span class="badge moves">👟<span id="movesVal">8</span></span>
+            <button class="itm" onclick="backToCover()" style="background:#e8a838;color:#fff;">🏠</button>
+        </div>
+        <div class="stage-dots" id="stageDots"></div>
+        <div class="card-grid" id="cardGrid"></div>
+        <div class="dock">
+            <div class="itm" onclick="useHint()">💡<span class="cnt" id="hintCnt">2</span></div>
+            <div class="itm" onclick="useShuffle()">🔀<span class="cnt" id="shuffleCnt">2</span></div>
+            <div class="itm" onclick="useBomb()">💣<span class="cnt" id="bombCnt">1</span></div>
+            <div class="itm" onclick="shareSteps()">📢+3步</div>
+        </div>
+    </div>
+    <div id="modalContainer"></div>
+    <div id="toastContainer"></div>
+</div>
+
+<script>
+// ========== 785组全局唯一配对库（已替换重复内容） ==========
+const ALL_PAIRS = [];
+
+function ap(m,d,a,b,h){
+    const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const c1=chars[Math.floor(Math.random()*26)]+chars[Math.floor(Math.random()*26)];
+    const c2=String(Math.floor(Math.random()*10000)).padStart(4,'0');
+    ALL_PAIRS.push({id:c1+c2,m:m,d:d,a:a,b:b,h:h});
+}
+
+// ===== 声学 80组 =====
+const soundData=[
+    [1,'声音的产生','物体振动','一切发声体都在振动'],
+    [1,'声音传播需要','介质','真空不能传声'],
+    [1,'15℃空气中声速','340 m/s','常温声速'],
+    [1,'音调由什么决定','频率','频率越高音调越高'],
+    [1,'响度由什么决定','振幅','振幅越大响度越大'],
+    [1,'人耳听觉频率范围','20Hz~20000Hz','可听声范围'],
+    [1,'乐音三要素','音调、响度、音色','声音三特征'],
+    [1,'音色由什么决定','发声体材料和结构','辨别乐器'],
+    [1,'声源','正在振动发声的物体','声音来源'],
+    [1,'声音在固体中传播','速度最快','V固>V液>V气'],
+    [1,'声音在液体中传播','速度次之','约1500m/s'],
+    [1,'声音在气体中传播','速度最慢','约340m/s'],
+    [1,'超声波频率范围','大于20000Hz','人耳听不到'],
+    [1,'次声波频率范围','小于20Hz','人耳听不到'],
+    [1,'吹笛子按压不同笛孔改变','音调（改变空气柱长度）','2016陕西真题'],
+    [1,'吉他能发出声音是因为','弦在振动','2015陕西真题'],
+    [1,'声呐利用什么传递信息','超声波（不是次声波）','2015陕西真题'],
+    [1,'市区禁止鸣笛在哪里减弱噪声','声源处','2015陕西真题'],
+    [1,'B超诊断仪利用什么工作','超声波（不是次声波）','2020陕西真题'],
+    [1,'改变试管内水量吹气改变','音调','2020陕西真题'],
+    [2,'声速公式变形','s=vt, t=s/v','路程和时间计算'],
+    [2,'频率与周期关系','f=1/T, T=1/f','互为倒数'],
+    [2,'回声测距公式','s=vt/2','往返距离÷2'],
+    [2,'波长公式','λ=v/f','波长=声速÷频率'],
+    [2,'声速大小比较','固体>液体>气体','介质影响'],
+    [2,'声速与温度关系','温度越高声速越大','正相关'],
+    [2,'区分回声条件','时间差>0.1s距离>17m','人耳分辨'],
+    [2,'超声波特点','方向性好穿透力强','声呐B超'],
+    [2,'次声波特点','传播远穿透力强','地震监测'],
+    [2,'减弱噪声途径','声源处、传播中、人耳处','三种途径'],
+    [2,'唢呐用不同力度吹奏改变','响度','2016陕西真题'],
+    [2,'唢呐前端喇叭主要改变','响度（不是音色）','2016陕西真题'],
+    [2,'鸟鸣声流水声由什么产生','振动','2019陕西真题'],
+    [2,'分辨鸟鸣声和流水声靠','音色','2019陕西真题'],
+    [2,'茂密树林有什么作用','吸声、消声','2019陕西真题'],
+    [3,'音调vs响度区别','频率决定vs振幅决定','女生音调高'],
+    [3,'超声波vs次声波','>20000Hz vs <20Hz','都听不到'],
+    [3,'固体传声vs空气传声','固体更快更清晰','土电话实验'],
+    [3,'真空不能传声实验','真空罩闹钟实验','介质必要'],
+    [3,'音调与物体长短','越短音调越高','尺子实验'],
+    [3,'响度与距离关系','越远响度越小','声音衰减'],
+    [3,'声波类型','纵波(疏密波)','振动方向与传播同'],
+    [3,'双耳效应','判断声源方向距离','立体声基础'],
+    [3,'声音在真空中能传播吗','不能','2021陕西真题'],
+    [3,'"放声高歌"的高指什么','响度大','2021陕西真题'],
+    [4,'声速测量实验原理','v=s/t测路程和时间','实验方法'],
+    [4,'音乐厅设计原理','反射板增强响度减少回声','建筑声学'],
+    [4,'dB分贝','声音强弱等级单位','0dB听觉下限'],
+    [4,'雪后安静原因','雪蓬松多孔吸收声音','自然吸音'],
+    [4,'听诊器原理','减小声音分散增大响度','医疗应用'],
+    [4,'0dB含义','人耳刚能听到的最弱声音','听觉下限'],
+    [4,'90dB以上危害','长期暴露损伤听力','噪声危害'],
+    [5,'示波器显示波形','声音可视化','频率不同波形不同'],
+    [5,'声速与介质温度精确关系','温度每升高1℃声速增0.6m/s','精确计算'],
+    [5,'建筑声学设计','减少回声聚焦','音乐厅'],
+    [5,'用力敲鼓是为了提高','响度（不是音调）','2023陕西真题'],
+    [5,'分辨腰鼓声音靠','音色（不是响度）','2023陕西真题'],
+    [5,'腰鼓声由什么产生','鼓面振动','2023陕西真题'],
+    [5,'"响亮"描述声音的','响度大','2024陕西真题'],
+    [5,'现场观众听到声音的介质','空气','2024陕西真题'],
+    [5,'振幅越大什么越大','响度（不是音调）','2025陕西真题'],
+];
+soundData.forEach(p=>ap('声学',p[0],p[1],p[2],p[3]));
+
+// ===== 光学 80组 =====
+const opticsData=[
+    [1,'光沿什么传播','直线','同种均匀介质'],
+    [1,'光的反射定律','入射角=反射角','镜面反射'],
+    [1,'平面镜成像特点','等大等距正立虚像','像与物对称'],
+    [1,'真空中光速','3×10⁸ m/s','宇宙最快'],
+    [1,'凸透镜对光的作用','会聚','中间厚边缘薄'],
+    [1,'凹透镜对光的作用','发散','中间薄边缘厚'],
+    [1,'光的三原色','红、绿、蓝','叠加得白色'],
+    [1,'红外线特点','热效应强','遥控器'],
+    [1,'紫外线特点','使荧光物质发光','验钞机'],
+    [1,'影子形成原因','光沿直线传播','不透明遮挡'],
+    [1,'水中倒影是什么现象','光的反射','2023陕西真题'],
+    [1,'手影游戏是什么现象','光的直线传播','2023陕西真题'],
+    [1,'海市蜃楼是什么现象','光的折射','2023陕西真题'],
+    [1,'雨后彩虹是什么现象','光的色散','2023陕西真题'],
+    [1,'木杆影子是什么形成','光的直线传播（不是反射）','2019陕西真题'],
+    [2,'凸透镜u>2f成像','倒立缩小实像','照相机原理'],
+    [2,'凸透镜f<u<2f成像','倒立放大实像','投影仪原理'],
+    [2,'凸透镜u<f成像','正立放大虚像','放大镜原理'],
+    [2,'折射率公式','n=c/v','n>1'],
+    [2,'光从空气斜射入水','折射角<入射角','向法线偏折'],
+    [2,'光从水斜射入空气','折射角>入射角','远离法线'],
+    [2,'白光经三棱镜','分解为七色光','光的色散'],
+    [2,'凸面镜作用','扩大视野','汽车后视镜'],
+    [2,'凹面镜作用','会聚光线','太阳灶手电筒'],
+    [2,'近视眼矫正','凹透镜','发散光线'],
+    [2,'远视眼矫正','凸透镜','会聚光线'],
+    [2,'老花镜','凸透镜','远视矫正'],
+    [2,'验钞机利用什么光','紫外线（不是红外线）','2019陕西真题'],
+    [2,'舞蹈演员平面镜中成什么像','等大虚像（不是实像）','2019陕西真题'],
+    [2,'筷子弯折是什么现象','光的折射','2019陕西真题'],
+    [3,'镜面反射vs漫反射','都遵循反射定律','表面粗糙度不同'],
+    [3,'实像vs虚像区别','实像能呈在光屏上','虚像不能'],
+    [3,'近视眼成因','晶状体过厚像在视网膜前','眼球过长'],
+    [3,'远视眼成因','晶状体过薄像在视网膜后','眼球过短'],
+    [3,'透明物体颜色','由透过色光决定','滤光'],
+    [3,'不透明物体颜色','由反射色光决定','颜料'],
+    [3,'白色物体反射','所有色光','全反射'],
+    [3,'黑色物体吸收','所有色光','全吸收'],
+    [3,'彩色电视色彩由什么混合','红绿蓝（不是红黄蓝）','2020陕西真题'],
+    [3,'电视机遥控器利用什么','红外线','2020陕西真题'],
+    [4,'凸透镜公式','1/f=1/u+1/v','成像公式'],
+    [4,'凸透镜成像规律','物近像远像变大','动态变化'],
+    [4,'光路可逆原理','反射和折射都可逆','可逆性'],
+    [4,'光纤通信原理','光的全反射','信息传输'],
+    [4,'照相镜头与被拍对象距离','大于二倍焦距','2020陕西真题'],
+    [4,'想把文字拍更大镜头应','靠近石碑','2020陕西真题'],
+    [4,'桥在水中的倒影是什么像','虚像（光的反射）','2022陕西真题'],
+    [4,'水珠相当于什么镜','凸透镜','2015陕西真题'],
+    [5,'近视远视对比','晶状体过厚vs过薄','成像位置不同'],
+    [5,'角反射器原理','互成直角三面镜','原路返回'],
+    [5,'激光特点','方向性好单色性好','准直测量'],
+    [5,'海市蜃楼成因','光在不均匀大气折射','虚像'],
+    [5,'彩虹形成条件','雨后阳光+小水滴','折射+反射+色散'],
+    [5,'紫外线有显著热效应吗','没有（红外线才有）','2022陕西真题'],
+    [5,'水珠中后方人成什么像','倒立缩小实像','2015陕西真题'],
+    [5,'水珠在水中成什么像','虚像（平面镜成像）','2015陕西真题'],
+];
+opticsData.forEach(p=>ap('光学',p[0],p[1],p[2],p[3]));
+
+// ===== 力学 180组（含陕西真题高频考点） =====
+const mechData=[
+    [1,'速度公式','v=s/t','路程÷时间'],
+    [1,'重力公式','G=mg','g≈9.8N/kg'],
+    [1,'密度公式','ρ=m/V','质量÷体积'],
+    [1,'压强公式','p=F/S','压力÷受力面积'],
+    [1,'牛顿第一定律','惯性定律','不受力保持原状态'],
+    [1,'重力的方向','竖直向下','指向地心'],
+    [1,'浮力的方向','竖直向上','与重力相反'],
+    [1,'力的作用效果','形变或改变运动状态','两种效果'],
+    [1,'力的三要素','大小方向作用点','影响力的效果'],
+    [1,'质量是物体的','基本属性','不随位置改变'],
+    [1,'参照物','判断运动静止的标准','运动相对性'],
+    [1,'匀速直线运动','速度大小方向不变','平衡状态'],
+    [1,'水的密度','1.0×10³ kg/m³','4℃时'],
+    [1,'g的取值','9.8N/kg或10N/kg','重力加速度'],
+    [1,'1N大约','托起两个鸡蛋','力的感受'],
+    [1,'初中生50m跑步一般用时','约8s','2023陕西真题'],
+    [1,'运动鞋底花纹为了','增大摩擦','2015陕西真题'],
+    [1,'铅球下落能量如何转化','重力势能→动能','2015陕西真题'],
+    [1,'一名中学生质量约','50kg','2022陕西真题'],
+    [1,'茶杯高度约','10cm','2025陕西真题'],
+    [2,'密度变形公式','m=ρV, V=m/ρ','三个量互求'],
+    [2,'液体压强公式','p=ρgh','与深度密度有关'],
+    [2,'功的公式','W=Fs','力×位移'],
+    [2,'功率公式','P=W/t','做功快慢'],
+    [2,'杠杆平衡条件','F1L1=F2L2','动力臂×动力=阻力臂×阻力'],
+    [2,'滑轮组拉力','F=G/n','n为动滑轮绳子段数'],
+    [2,'增大压强方法','增大压力或减小面积','p=F/S'],
+    [2,'减小压强方法','减小压力或增大面积','坦克履带'],
+    [2,'弹簧测力计原理','伸长量与拉力正比','弹性限度内'],
+    [2,'重力与质量关系','G/m=常数=g','正比关系'],
+    [2,'速度变形公式','s=vt, t=s/v','路程时间计算'],
+    [2,'机械效率公式','η=W有用/W总×100%','η<1'],
+    [2,'水坝下部比上部宽因为','液体压强随深度增加增大','2015陕西真题'],
+    [2,'火车安全黄线依据','流速大压强小','2015陕西真题'],
+    [2,'被石块绊倒向前倾因为','上身由于惯性保持原状态','2015陕西真题'],
+    [3,'质量vs重量','质量不变重量可变','质量是属性'],
+    [3,'平衡力vs相互作用力','是否同一受力物体','关键区别'],
+    [3,'压力vs重力','压力不一定等于重力','受力分析'],
+    [3,'动能vs势能','运动vs位置/形变','机械能=动能+势能'],
+    [3,'定滑轮vs动滑轮','改方向vs省力','等臂/省力杠杆'],
+    [3,'漂浮vs悬浮','ρ液>ρ物 vs ρ液=ρ物','V排不同'],
+    [3,'不做功三种情况','有力无距离/有距离无力/垂直','W=0'],
+    [3,'省力vs费力杠杆','动力臂>阻力臂 vs <阻力臂','省力/省距离'],
+    [3,'滑动摩擦vs静摩擦','相对滑动vs有趋势','f滑=μF压'],
+    [3,'力改变vs维持运动','改变非维持','牛顿观点'],
+    [3,'脚对球和球对脚的力关系','相互作用力（不是平衡力）','2015陕西真题'],
+    [3,'地铁启动越来越快因为','受非平衡力','2017陕西真题'],
+    [3,'地铁刹车不能立即停止因为','惯性（不是"受到惯性"）','2017陕西真题'],
+    [3,'扇一扇凉快因为','蒸发吸热（不是空气降温）','2018陕西真题'],
+    [3,'钢尺比塑料尺凉因为','钢的导热性好','2018陕西真题'],
+    [4,'阿基米德原理','F浮=G排=ρ液gV排','浮力=排液重力'],
+    [4,'物体浮沉条件','F浮>G上浮/F浮=G悬浮/F浮<G下沉','三种状态'],
+    [4,'托里拆利实验','水银柱760mm=1.013×10⁵Pa','测大气压'],
+    [4,'流体压强与流速','流速大压强小','伯努利原理'],
+    [4,'帕斯卡定律','密闭液体压强等大传递','液压机原理'],
+    [4,'功的原理','任何机械都不省功','W总≥W有用'],
+    [4,'η与物重关系','物重越大η越高','η=G物/(G物+G动)'],
+    [4,'密度测量实验','排水法ρ=m/(V2-V1)','先质量后体积'],
+    [4,'潜水艇原理','改变自身重力','水舱注排水'],
+    [4,'密度计原理','漂浮F浮=G','浸入越深ρ液越小'],
+    [4,'避险车道相当于','斜面','2018陕西真题'],
+    [4,'大货车冲上避险车道能量','动能→重力势能（不是全部）','2018陕西真题'],
+    [4,'大货车下坡动能变化','越来越大','2018陕西真题'],
+    [4,'甜瓜漂浮时浮力与重力','等于','2016陕西真题'],
+    [4,'矿泉水结冰瓶底凸出因为','冰的密度小于水','2017陕西真题'],
+    [5,'动能表达式','Ek=½mv²','与速度平方正比'],
+    [5,'重力势能表达式','Ep=mgh','与高度正比'],
+    [5,'重心位置','重力作用点','不一定在物体上'],
+    [5,'滚动摩擦vs滑动摩擦','滚动远小于滑动','轴承原理'],
+    [5,'悬浮与漂浮区别','ρ液=ρ物 vs ρ液>ρ物','V排不同'],
+    [5,'机械效率总小于1','额外功不可避免','摩擦和自重'],
+    [5,'上浮条件','F浮>G物','ρ液>ρ物'],
+    [5,'下沉条件','F浮<G物','ρ液<ρ物'],
+    [5,'龙舟向后划水向前进因为','力的作用是相互的','2018陕西真题'],
+    [5,'并排龙舟不能太近因为','流速大压强小','2018陕西真题'],
+    [5,'天宫课堂乒乓球悬停因为','不受浮力（失重）','2022陕西真题'],
+    [5,'用力将弓拉弯说明','力改变物体形状','2021陕西真题'],
+    [5,'"受到惯性作用"正确吗','错误（惯性与力无关）','2021陕西真题'],
+    [5,'无人机降落重力势能','减小','2025陕西真题'],
+    [5,'脚蹬地同时地对脚施力说明','力的作用是相互的','2025陕西真题'],
+];
+mechData.forEach(p=>ap('力学',p[0],p[1],p[2],p[3]));
+
+// ===== 电学 161组（含陕西真题高频考点） =====
+const elecData=[
+    [1,'欧姆定律','I=U/R','电流与电压正比'],
+    [1,'家庭电路电压','220V','中国标准'],
+    [1,'人体安全电压','≤36V','安全用电'],
+    [1,'电功率公式','P=UI','电压×电流'],
+    [1,'电流方向规定','正电荷定向移动方向','人为规定'],
+    [1,'导体','容易导电的物体','金属石墨'],
+    [1,'绝缘体','不容易导电的物体','橡胶玻璃'],
+    [1,'电路组成','电源导线开关用电器','四部分'],
+    [1,'摩擦起电实质','电子转移','非创造电荷'],
+    [1,'同种电荷','相互排斥','验电器原理'],
+    [1,'异种电荷','相互吸引','静电吸引'],
+    [1,'LED灯材料属于','半导体','2015陕西真题'],
+    [1,'白光LED用什么色光混合','红、绿、蓝','2015陕西真题'],
+    [1,'发现触电应立即','切断电源（不能用手拉）','2015陕西真题'],
+    [1,'开关必须接在哪条线上','火线（不能接零线）','2015陕西真题'],
+    [2,'欧姆定律变形','U=IR, R=U/I','三个量互求'],
+    [2,'串联电流特点','处处相等','I=I1=I2'],
+    [2,'并联电压特点','各支路相等','U=U1=U2'],
+    [2,'串联总电阻','R=R1+R2','相加变大'],
+    [2,'并联总电阻','1/R=1/R1+1/R2','倒数之和变小'],
+    [2,'电功公式','W=UIt','电压×电流×时间'],
+    [2,'焦耳定律','Q=I²Rt','电热与电流平方正比'],
+    [2,'1kW·h换算','=3.6×10⁶ J','电能单位'],
+    [2,'滑动变阻器原理','改变接入电阻丝长度','一上一下'],
+    [2,'影响电阻因素','材料长度横截面积温度','R=ρL/S'],
+    [2,'串联分压公式','U1:U2=R1:R2','电阻大分压多'],
+    [2,'并联分流公式','I1:I2=R2:R1','电阻大电流小'],
+    [2,'熔丝熔断能用铜丝代替吗','不能','2019陕西真题'],
+    [2,'家庭电路维修前应先','断电','2016陕西真题'],
+    [2,'拔插头正确做法','捏插头（不能拽电线）','2016陕西真题'],
+    [3,'串联vs并联','一条路径vs多条路径','电流有无分支'],
+    [3,'电功vs电热','W=UIt vs Q=I²Rt','纯电阻相等'],
+    [3,'电动机vs发电机','电能→机械能vs机械能→电能','方向相反'],
+    [3,'电流表vs电压表','串联vs并联','接法不同'],
+    [3,'短路vs断路','导线直连电源vs断开','通路断路短路'],
+    [3,'额定功率vs实际功率','额定电压vs实际电压','一个vs多个'],
+    [3,'交流电vs直流电','方向周期变vs不变','50Hz'],
+    [3,'火线vs零线','有220V vs 0V','试电笔辨别'],
+    [3,'电阻与温度关系','多数导体温度高电阻大','正相关'],
+    [3,'发电机原理是什么','电磁感应','2016陕西真题'],
+    [3,'三线插头最长脚是','接地线','2016陕西真题'],
+    [3,'取下L1时L2能发光吗','能（并联互不影响）','2018陕西真题'],
+    [3,'电能表用来测量','电能（不是电功率）','2018陕西真题'],
+    [4,'电磁感应','闭合电路切割磁感线','磁生电法拉第'],
+    [4,'安培定则','右手螺旋定则','判断N极'],
+    [4,'伏安法测电阻','R=U/I多次平均','减小误差'],
+    [4,'纯电阻电功电热','Q=W=UIt=I²Rt=U²/Rt','等效'],
+    [4,'非纯电阻电路','Q=I²Rt, W=UIt, Q<W','电动机'],
+    [4,'家庭电路电流过大','短路或总功率过大','保险丝熔断'],
+    [4,'奥斯特实验','通电导体周围有磁场','电流磁效应'],
+    [4,'电磁铁优点','磁性有无强弱极性可控','三个可控'],
+    [4,'电动机原理','通电线圈磁场中受力转动','电能→机械能'],
+    [4,'发电机原理','电磁感应','机械能→电能'],
+    [4,'试电笔手不能接触金属体吗','要接触笔尾金属体','2018陕西真题'],
+    [4,'金属外壳用电器需接地吗','需要（防止触电）','2019陕西真题'],
+    [4,'空间站画面传回地球利用','电磁波','2024陕西真题'],
+    [4,'核反应堆利用什么','核裂变','2021陕西真题'],
+    [5,'电磁感应条件','闭合+部分+切割','三个条件'],
+    [5,'保险丝材料','铅锑合金电阻大熔点低','不能用铜丝'],
+    [5,'安全用电原则','不接触低压不靠近高压','两条原则'],
+    [5,'三孔插座接法','左零右火上接地','安全规范'],
+    [5,'金属外壳须接地','防止触电','保护接地'],
+    [5,'试电笔使用','氖管发光为火线','辨别火零'],
+    [5,'家庭电路组成','进户线电能表开关保险用电器','顺序'],
+    [5,'开关接火线','螺口灯泡螺旋接零线','安全规范'],
+    [5,'触电原因','直接或间接接触火线','人体导电'],
+    [5,'热成像仪检测什么','红外线','2025陕西真题'],
+    [5,'图像传输利用什么','电磁波','2025陕西真题'],
+    [5,'绝缘皮破损电线能用吗','不能','2025陕西真题'],
+    [5,'电机充电时不接打电话因','安全（防止过热爆炸）','2024陕西真题'],
+    [5,'磁悬浮音箱悬浮利用','同名磁极相互排斥','2021陕西真题'],
+];
+elecData.forEach(p=>ap('电学',p[0],p[1],p[2],p[3]));
+
+// ===== 热学 130组（含陕西真题高频考点） =====
+const heatData=[
+    [1,'温度表示','物体冷热程度','℃'],
+    [1,'热量公式','Q=cmΔt','比热容×质量×温差'],
+    [1,'晶体熔化特点','吸热温度不变','冰水混合物0℃'],
+    [1,'改变内能方式','做功和热传递','等效'],
+    [1,'人体正常体温','约37℃','常识'],
+    [1,'蒸发','液体表面缓慢汽化','任何温度'],
+    [1,'沸腾','内部表面剧烈汽化','达到沸点'],
+    [1,'升华','固态直接变气态','樟脑丸变小'],
+    [1,'凝华','气态直接变固态','霜的形成'],
+    [1,'分子动理论','物质由分子组成','微观世界'],
+    [1,'扩散现象','不同物质相互进入','分子运动'],
+    [1,'冰挂形成是什么现象','凝固（不是凝华）','2015陕西真题'],
+    [1,'云的形成是什么现象','液化','2015陕西真题'],
+    [1,'霜的形成是什么现象','凝华（不是凝固）','2015陕西真题'],
+    [1,'雾的形成是什么现象','液化','2015陕西真题'],
+    [2,'吸热公式','Q吸=cm(t-t0)','末温-初温'],
+    [2,'放热公式','Q放=cm(t0-t)','初温-末温'],
+    [2,'燃料放热公式','Q=mq','质量×热值'],
+    [2,'热平衡方程','Q吸=Q放','无热量损失'],
+    [2,'比热容单位','J/(kg·℃)','物质特性'],
+    [2,'沸点与气压','气压高沸点高','高压锅'],
+    [2,'内燃机四冲程','吸气压缩做功排气','工作循环'],
+    [2,'压缩冲程转化','机械能→内能','压缩生热'],
+    [2,'做功冲程转化','内能→机械能','燃气推动'],
+    [2,'热值定义','单位质量完全燃烧放热','J/kg'],
+    [2,'酒精不完全燃烧热值变吗','不变','2015陕西真题'],
+    [2,'闻到酒精气味说明','分子永不停息做无规则运动','2015陕西真题'],
+    [2,'瓶口"白气"是什么形成','液化（不是汽化）','2019陕西真题'],
+    [2,'水沸腾时吸热温度怎样','不变','2019陕西真题'],
+    [2,'用酒精灯加热水改变内能','热传递（不是做功）','2019陕西真题'],
+    [3,'蒸发vs沸腾','液体表面vs内部表面','任何温度vs沸点'],
+    [3,'熔化vs凝固','固态→液态vs液态→固态','吸热vs放热'],
+    [3,'汽化vs液化','液态→气态vs气态→液态','吸热vs放热'],
+    [3,'升华vs凝华','固态→气态vs气态→固态','吸热vs放热'],
+    [3,'晶体vs非晶体','有固定熔点vs无','冰海波vs蜡玻璃'],
+    [3,'热值比热容密度','都是物质特性','不随质量变化'],
+    [3,'汽油机vs柴油机','点燃式vs压燃式','火花塞vs喷油嘴'],
+    [3,'内能vs机械能','微观分子vs宏观物体','本质区别'],
+    [3,'热量vs温度','传递能量vs冷热程度','概念辨析'],
+    [3,'冰块保鲜利用什么','冰熔化吸热','2020陕西真题'],
+    [3,'水银体温计利用什么原理','液体热胀冷缩','2020陕西真题'],
+    [3,'饮料瓶外小水珠是什么','液化（不是凝华）','2020陕西真题'],
+    [3,'露和霜都是固体吗','露是液体霜是固体','2023陕西真题'],
+    [3,'霜是由水蒸气什么形成','凝华','2023陕西真题'],
+    [4,'比热容实验','加热相同时间比较升温','控制变量法'],
+    [4,'热机效率定义','有用功/燃料完全燃烧放热','η<1'],
+    [4,'熔化实验方法','水浴加热均匀受热','晶体熔化'],
+    [4,'沸腾实验方法','加盖减少热量散失','节省时间'],
+    [4,'碘升华凝华实验','加热升华冷却凝华','紫色碘蒸气'],
+    [4,'比热容大应用','暖气片汽车冷却','水比热大'],
+    [4,'沿海温差小原因','水比热大调节','气候影响'],
+    [4,'沙漠温差大原因','沙石比热小','气候影响'],
+    [4,'熔化吸热应用','吃冰棍解暑','降温'],
+    [4,'凝固放热应用','菜窖放水防冻','水结冰放热'],
+    [4,'水再次沸腾说明','沸点与水面气压有关','2019陕西真题'],
+    [4,'白霜是什么现象（车厢）','凝固','2021陕西真题'],
+    [4,'水凝固过程中温度','不变','2021陕西真题'],
+    [5,'晶体熔化条件','达熔点继续吸热','两个条件'],
+    [5,'液体沸腾条件','达沸点继续吸热','两个条件'],
+    [5,'同种晶体熔凝固点','相同','物性'],
+    [5,'汽油机构造','有火花塞','点燃式'],
+    [5,'柴油机构造','有喷油嘴无火花塞','压燃式'],
+    [5,'热力学温度','T=t+273K','开尔文'],
+    [5,'分子热运动','温度高运动剧烈','扩散加快'],
+    [5,'破镜不能重圆','分子距离大引力小','分子力条件'],
+    [5,'气体易压缩','分子间隙大','气体特点'],
+    [5,'热量是过程量还是状态量','过程量（不能说含有）','2024陕西真题'],
+    [5,'蜂蜡变液体是什么','熔化','2024陕西真题'],
+    [5,'干冰直接变气态叫','升华','2025陕西真题'],
+    [5,'"白气"是什么','小水滴（不是水蒸气）','2025陕西真题'],
+    [5,'做功改变内能例子','压缩空气棉花燃烧','2025陕西真题'],
+];
+heatData.forEach(p=>ap('热学',p[0],p[1],p[2],p[3]));
+
+// ===== 综合扩展 154组（含陕西真题易错判断） =====
+const mixData=[
+    [1,'牛顿贡献','万有引力三大定律','经典力学'],
+    [1,'阿基米德贡献','浮力定律杠杆原理','Eureka!'],
+    [1,'电子发现证明什么','原子可以再分','2017陕西真题'],
+    [1,'固体中分子是运动的吗','是（永不停息）','2017陕西真题'],
+    [1,'分子间只存在引力吗','不是（引力斥力同时存在）','2017陕西真题'],
+    [1,'原子核由什么组成','质子和中子','2022陕西真题'],
+    [1,'原子核带什么电','正电','2022陕西真题'],
+    [1,'用吸管喝饮料利用','大气压强','2015陕西真题'],
+    [1,'高压锅利用什么原理','气压增大沸点升高','2015陕西真题'],
+    [1,'一枚硬币质量约','5g','常识'],
+    [2,'力单位','牛顿(N)','1N≈0.1kg重力'],
+    [2,'压强单位','帕斯卡(Pa)','1Pa=1N/m²'],
+    [2,'功和能单位','焦耳(J)','1J=1N·m'],
+    [2,'功率单位','瓦特(W)','1W=1J/s'],
+    [2,'电流单位','安培(A)','基本单位'],
+    [2,'电压单位','伏特(V)','基本单位'],
+    [2,'电阻单位','欧姆(Ω)','基本单位'],
+    [2,'频率单位','赫兹(Hz)','1Hz=1次/秒'],
+    [2,'排水量指什么','满载时排开水的质量','2023陕西真题'],
+    [2,'漂浮时浮力与重力','相等','2023陕西真题'],
+    [3,'天平使用','先调平左物右码','m物=m砝+m游'],
+    [3,'量筒使用','视线与凹液面最低处平','排水法测体积'],
+    [3,'弹簧测力计使用','校零沿轴线','弹性限度内'],
+    [3,'电流表使用','串联正入负出','不能直连电源'],
+    [3,'电压表使用','并联正入负出','可直连电源'],
+    [3,'滑动变阻器使用','一上一下保护电路','闭合前调最大'],
+    [3,'温度计使用','玻璃泡全浸不碰壁','读数不离开'],
+    [3,'体温计使用','用前下甩缩口','可离开读数'],
+    [3,'控制变量法','改变一个因素其他不变','科学方法'],
+    [3,'转换法','将不易观察现象转换','如温度计'],
+    [3,'连通器例子','茶壶船闸涵洞','2022陕西真题'],
+    [3,'A点B点压强比较','深度大的压强大','2022陕西真题'],
+    [3,'浮力方向','竖直向上','2023陕西真题'],
+    [3,'煤油燃烧热值变吗','不变','2016陕西真题'],
+    [4,'等效替代法','用已知量替代未知量','如合力替代'],
+    [4,'理想实验法','忽略次要因素','牛顿第一定律'],
+    [4,'模型法','用模型表示实际物体','如磁感线光线'],
+    [4,'累积法','测量微小量','如测细铜丝直径'],
+    [4,'伏安法测电阻','R=U/I多次测量','减小误差'],
+    [4,'伏安法测电功率','P=UI多次测量','实验'],
+    [4,'探究欧姆定律','控制变量法','I与U正比I与R反比'],
+    [4,'探究液体压强','U形管压强计','与深度密度有关'],
+    [4,'探究浮力大小','称重法F浮=G-F示','与ρ液V排有关'],
+    [4,'探究杠杆平衡','水平平衡便于测力臂','F1L1=F2L2'],
+    [4,'"受到惯性""惯性力"正确吗','错误','高频易错'],
+    [4,'热量可以用"含有"吗','不可以（过程量）','2024陕西真题'],
+    [4,'绿色物体反射什么光','绿光','2024陕西真题'],
+    [4,'匀速直线运动速度与路程有关吗','无关','基础易错'],
+    [5,'探究动能因素','质量速度控制变量','速度影响更大'],
+    [5,'探究重力势能','质量高度控制变量','举高'],
+    [5,'探究比热容','加热相同时间比较升温','水比热大'],
+    [5,'探究热值','完全燃烧加热水','Q=mq'],
+    [5,'探究电磁铁','电流匝数控制变量','三个可控'],
+    [5,'探究感应电流','闭合部分切割','三个条件'],
+    [5,'安全用电','不接触低压不靠近高压','两条原则'],
+    [5,'触电急救','切断电源人工呼吸','不能用手拉'],
+    [5,'电路设计原则','安全节能方便','开关接火线'],
+    [5,'物理学研究方法','观察实验理论','科学探究'],
+    [5,'误差可以避免吗','不可以（只能减小）','基础易错'],
+    [5,'力是维持运动的原因吗','不是（改变运动状态）','核心概念'],
+    [5,'相互接触一定有力吗','不一定','易错判断'],
+    [5,'不接触一定没有力吗','不一定（磁力重力）','易错判断'],
+    [5,'晶体熔化时温度内能','温度不变内能增加','核心考点'],
+];
+mixData.forEach(p=>ap('综合',p[0],p[1],p[2],p[3]));
+
+// 房间配置：4小关卡×11台阶=44台阶
+const ROOMS = [
+    {id:0,floor:'1F',scientist:'伽利略',mod:'声学',totalStairs:44,stairsPerStage:11},
+    {id:1,floor:'2F',scientist:'牛顿',mod:'光学',totalStairs:44,stairsPerStage:11},
+    {id:2,floor:'3F',scientist:'阿基米德',mod:'力学',totalStairs:44,stairsPerStage:11},
+    {id:3,floor:'4F',scientist:'帕斯卡',mod:'力学',totalStairs:44,stairsPerStage:11},
+    {id:4,floor:'5F',scientist:'欧姆',mod:'电学',totalStairs:44,stairsPerStage:11},
+    {id:5,floor:'6F',scientist:'法拉第',mod:'电学',totalStairs:44,stairsPerStage:11},
+    {id:6,floor:'7F',scientist:'焦耳',mod:'热学',totalStairs:44,stairsPerStage:11},
+    {id:7,floor:'8F',scientist:'爱因斯坦',mod:'综合',totalStairs:44,stairsPerStage:11}
+];
+
+function getDiffLevel(si,total){const r=si/total;if(r<0.25)return 1;if(r<0.5)return 2;if(r<0.75)return 3;if(r<0.9)return 4;return 5;}
+
+let playerName='',currentRoomIdx=0,currentStair=0,totalScore=0;
+let cards=[],selIdx=null,movesLeft=8,hintN=2,shufN=2,bombN=1;
+let comboCount=0,gameActive=false,propCd=false;
+let unlockedStairs={};
+let globalPairUsage={};
+
+const $=id=>document.getElementById(id);
+const loginScreen=$('loginScreen'),coverScreen=$('coverScreen'),gameScreen=$('gameScreen');
+const cardGrid=$('cardGrid'),modalC=$('modalContainer'),toastC=$('toastContainer');
+
+let audioCtx;
+function initAudio(){if(!audioCtx)try{audioCtx=new AudioContext();}catch(e){}if(audioCtx?.state==='suspended')audioCtx.resume();}
+function tone(f,t,d,v=0.1){if(!audioCtx)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}
+function soundCorrect(){tone(660,'sine',0.1);tone(880,'sine',0.1,0.07);}
+function soundWrong(){tone(250,'square',0.15);}
+function soundCombo(){tone(880,'triangle',0.08);tone(1100,'triangle',0.08,0.06);tone(1320,'triangle',0.1,0.08);}
+
+function saveProgress(){
+    const data={playerName,currentRoomIdx,currentStair,totalScore,hintN,shufN,bombN,unlockedStairs,globalPairUsage};
+    localStorage.setItem('physicsGameFinalV2',JSON.stringify(data));
+}
+function loadProgress(){
+    const saved=localStorage.getItem('physicsGameFinalV2');
+    if(saved){try{const d=JSON.parse(saved);playerName=d.playerName||'';currentRoomIdx=d.currentRoomIdx||0;currentStair=d.currentStair||0;totalScore=d.totalScore||0;hintN=d.hintN??2;shufN=d.shufN??2;bombN=d.bombN??1;unlockedStairs=d.unlockedStairs||{};globalPairUsage=d.globalPairUsage||{};return true;}catch(e){}}
+    return false;
+}
+
+function isRoomUnlocked(idx){if(idx===0)return true;const prev=ROOMS[idx-1];return(unlockedStairs[prev.id]||0)>=prev.totalStairs;}
+function isRoomCompleted(idx){return(unlockedStairs[idx]||0)>=ROOMS[idx].totalStairs;}
+
+function updateTowerLocks(){
+    const floors=document.querySelectorAll('.floor');
+    floors.forEach((f,i)=>{const ri=7-i;f.classList.remove('locked','completed');if(isRoomCompleted(ri))f.classList.add('completed');else if(!isRoomUnlocked(ri))f.classList.add('locked');});
+}
+
+function login(){
+    const input=$('nicknameInput').value.trim();
+    if(!input)return;
+    playerName=input;
+    if(!loadProgress()){playerName=input;currentRoomIdx=0;currentStair=0;totalScore=0;hintN=2;shufN=2;bombN=1;unlockedStairs={};globalPairUsage={};}
+    $('welcomeUser').textContent=playerName;
+    loginScreen.classList.add('hidden');coverScreen.classList.remove('hidden');
+    updateTowerLocks();saveProgress();
+}
+function logout(){
+    localStorage.removeItem('physicsGameFinalV2');
+    playerName='';unlockedStairs={};globalPairUsage={};currentRoomIdx=0;currentStair=0;totalScore=0;hintN=2;shufN=2;bombN=1;
+    coverScreen.classList.add('hidden');gameScreen.classList.add('hidden');loginScreen.classList.remove('hidden');
+}
+function enterRoom(idx){
+    if(!isRoomUnlocked(idx)){showModal('🔒 房间未解锁','请先通关上一个房间！','<button onclick="hideModal()">确定</button>');return;}
+    initAudio();currentRoomIdx=idx;
+    const room=ROOMS[idx];
+    const unlocked=unlockedStairs[idx]||0;
+    if(unlocked>=room.totalStairs){showModal('🏁 房间已完成','全部44台阶已完成！','<button onclick="backToCover()">返回大厅</button>');return;}
+    currentStair=unlocked;totalScore=0;
+    coverScreen.classList.add('hidden');gameScreen.classList.remove('hidden');
+    renderStageDots();loadStair();
+}
+function renderStageDots(){
+    const room=ROOMS[currentRoomIdx];
+    const unlocked=unlockedStairs[currentRoomIdx]||0;
+    const cs=Math.floor(unlocked/room.stairsPerStage);
+    const ts=Math.ceil(room.totalStairs/room.stairsPerStage);
+    const dc=$('stageDots');dc.innerHTML='';
+    for(let i=0;i<ts;i++){
+        const d=document.createElement('div');d.className='stage-dot';
+        if(i<cs){d.classList.add('done');d.textContent='✓';}
+        else if(i===cs){d.classList.add('current');d.textContent=i+1;}
+        else{d.classList.add('locked');d.textContent='🔒';}
+        dc.appendChild(d);
+    }
+}
+function loadStair(){
+    const room=ROOMS[currentRoomIdx];
+    const mod=room.mod;
+    const diffLevel=getDiffLevel(currentStair,room.totalStairs);
+    let pool;
+    if(mod==='综合'){pool=ALL_PAIRS.filter(p=>p.d===diffLevel);if(pool.length<6)pool=ALL_PAIRS.filter(p=>p.d<=diffLevel);}
+    else{pool=ALL_PAIRS.filter(p=>p.m===mod);const dp=pool.filter(p=>p.d===diffLevel);if(dp.length>=4)pool=dp;else pool=pool.filter(p=>p.d<=diffLevel);}
+    const avail=pool.filter(p=>(globalPairUsage[p.id]||0)<2);
+    const src=avail.length>=4?avail:pool.filter(p=>(globalPairUsage[p.id]||0)<3);
+    const shf=[...src].sort(()=>Math.random()-0.5);
+    const sel=[];
+    for(let p of shf){if(sel.length>=4)break;sel.push(p);globalPairUsage[p.id]=(globalPairUsage[p.id]||0)+1;}
+    cards=[];
+    sel.forEach((p,i)=>{cards.push({id:i*2,pi:i,txt:p.a,hint:p.h,elim:false});cards.push({id:i*2+1,pi:i,txt:p.b,hint:p.h,elim:false});});
+    cards.sort(()=>Math.random()-0.5);
+    selIdx=null;gameActive=true;comboCount=0;movesLeft=8;
+    const sn=Math.floor(currentStair/room.stairsPerStage)+1;
+    const si=(currentStair%room.stairsPerStage)+1;
+    const diffStars='⭐'.repeat(diffLevel);
+    $('roomTag').textContent=room.scientist+'·'+(mod==='综合'?'综合厅':mod);
+    $('stairTag').textContent=`小关卡${sn} 台阶${si}/${room.stairsPerStage}`;
+    $('diffTag').textContent=diffStars;
+    $('scoreVal').textContent=totalScore;$('movesVal').textContent=movesLeft;
+    $('hintCnt').textContent=hintN;$('shuffleCnt').textContent=shufN;$('bombCnt').textContent=bombN;
+    renderStageDots();hideModal();render();
+}
+function render(){
+    const rem=cards.filter(c=>!c.elim);
+    cardGrid.innerHTML='';
+    rem.forEach(c=>{const oi=cards.indexOf(c);const el=document.createElement('div');el.className='pcard';if(selIdx===oi)el.classList.add('selected');el.textContent=c.txt;el.addEventListener('click',()=>onCardClick(oi));cardGrid.appendChild(el);});
+    if(rem.length===0&&gameActive){
+        gameActive=false;totalScore+=movesLeft*10;$('scoreVal').textContent=totalScore;
+        const room=ROOMS[currentRoomIdx];const rk=currentRoomIdx.toString();
+        const nu=Math.min((unlockedStairs[rk]||0)+1,room.totalStairs);
+        unlockedStairs[rk]=nu;currentStair=nu;saveProgress();
+        const sc=(nu%room.stairsPerStage===0);
+        if(currentStair<room.totalStairs){
+            if(sc){const cs2=Math.floor(nu/room.stairsPerStage);showModal('🎉 小关卡通关！',`第${cs2}小关卡完成！`,'<button onclick="loadStair()">继续攀登</button>');}
+            else{showModal('✅ 台阶通过','','<button onclick="loadStair()">继续</button>');}
+        }else{updateTowerLocks();saveProgress();showModal('🏆 房间通关！',`完成${room.scientist}全部44台阶！总分:${totalScore}`,currentRoomIdx<7?'<button onclick="nextRoom()">🔓 上一层楼</button>':'<button onclick="victory()">🏆 登顶大厦</button>');}
+    }
+}
+function onCardClick(idx){
+    if(!gameActive||movesLeft<=0)return;
+    const c=cards[idx];if(c.elim)return;
+    if(selIdx===null){selIdx=idx;render();return;}
+    if(selIdx===idx){selIdx=null;render();return;}
+    const f=cards[selIdx];
+    if(f.pi===c.pi&&f.id!==c.id){
+        f.elim=c.elim=true;comboCount++;totalScore+=10*comboCount;
+        if(comboCount>=2){soundCombo();showComboPop(`🔥 ${comboCount}连击！`);}else soundCorrect();
+        selIdx=null;render();$('scoreVal').textContent=totalScore;
+    }else{
+        movesLeft--;comboCount=0;soundWrong();toast('❌ 剩余'+movesLeft+'步');
+        selIdx=null;render();$('movesVal').textContent=movesLeft;
+        if(movesLeft<=0&&cards.filter(c=>!c.elim).length>0){gameActive=false;setTimeout(()=>showModal('😵 步数耗尽','','<button onclick="resetStair()">🔄 重试</button>'),500);}
+    }
+}
+function showComboPop(t){const p=document.createElement('div');p.className='combo-pop';p.textContent=t;document.body.appendChild(p);setTimeout(()=>p.remove(),800);}
+function resetStair(){hideModal();loadStair();}
+function useHint(){
+    if(propCd||!gameActive)return;if(hintN<=0){toast('提示不足');return;}
+    propCd=true;hintN--;$('hintCnt').textContent=hintN;saveProgress();
+    const um=cards.filter(c=>!c.elim);const pm=new Map();
+    um.forEach(c=>{if(!pm.has(c.pi))pm.set(c.pi,[]);pm.get(c.pi).push(c);});
+    let tg=null;for(let v of pm.values()){if(v.length===2){tg=v;break;}}
+    if(!tg){toast('无配对');propCd=false;return;}
+    const i0=cards.indexOf(tg[0]),i1=cards.indexOf(tg[1]);
+    const all=cardGrid.querySelectorAll('.pcard');
+    if(all[i0])all[i0].classList.add('hint-glow');if(all[i1])all[i1].classList.add('hint-glow');
+    setTimeout(()=>{if(all[i0])all[i0].classList.remove('hint-glow');if(all[i1])all[i1].classList.remove('hint-glow');propCd=false;},1800);
+}
+function useShuffle(){
+    if(propCd||!gameActive)return;if(shufN<=0){toast('洗牌不足');return;}
+    propCd=true;shufN--;$('shuffleCnt').textContent=shufN;saveProgress();
+    const ac=cards.filter(c=>!c.elim);ac.sort(()=>Math.random()-0.5);
+    let si=0;cards.forEach((c,i)=>{if(!c.elim)cards[i]=ac[si++];});
+    selIdx=null;render();setTimeout(()=>propCd=false,400);
+}
+function useBomb(){
+    if(propCd||!gameActive)return;if(bombN<=0){toast('炸弹不足');return;}
+    propCd=true;bombN--;$('bombCnt').textContent=bombN;saveProgress();
+    const ac=cards.filter(c=>!c.elim);if(ac.length<2){toast('卡片少');propCd=false;return;}
+    const pm=new Map();ac.forEach(c=>{if(!pm.has(c.pi))pm.set(c.pi,[]);pm.get(c.pi).push(c);});
+    let tg=null;for(let v of pm.values()){if(v.length===2){tg=v;break;}}
+    if(tg){tg[0].elim=tg[1].elim=true;}else ac[0].elim=true;
+    selIdx=null;render();setTimeout(()=>propCd=false,400);
+}
+function shareSteps(){movesLeft+=3;$('movesVal').textContent=movesLeft;toast('📢 +3步');}
+function nextRoom(){hideModal();currentRoomIdx++;currentStair=unlockedStairs[currentRoomIdx]||0;totalScore=0;updateTowerLocks();loadStair();}
+function victory(){showModal('🏆 登顶物理学大厦！','总分:'+totalScore,'<button onclick="backToCover()">返回大厅</button>');}
+function backToCover(){gameScreen.classList.add('hidden');coverScreen.classList.remove('hidden');hideModal();saveProgress();updateTowerLocks();}
+function showModal(t,m,b){modalC.innerHTML=`<div class="modal"><div class="modal-box"><h3>${t}</h3><p>${m}</p><div>${b}</div></div></div>`;}
+function hideModal(){modalC.innerHTML='';}
+function toast(msg){toastC.innerHTML=`<div class="toast">${msg}</div>`;setTimeout(()=>toastC.innerHTML='',2000);}
+
+// 启动
+if(loadProgress()){loginScreen.classList.add('hidden');coverScreen.classList.remove('hidden');$('welcomeUser').textContent=playerName;updateTowerLocks();}
+else{loginScreen.classList.remove('hidden');coverScreen.classList.add('hidden');gameScreen.classList.add('hidden');}
+</script>
+</body>
+</html>
